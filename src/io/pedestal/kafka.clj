@@ -1,44 +1,73 @@
 (ns io.pedestal.kafka
   (:require [clojure.spec :as s]
+            [io.pedestal.kafka.common    :as common]
             [io.pedestal.kafka.connector :as connector]
-            [io.pedestal.kafka.producer :as producer]
-            [io.pedestal.kafka.consumer :as consumer]))
+            [io.pedestal.kafka.producer  :as producer]
+            [io.pedestal.kafka.consumer  :as consumer]
+            [io.pedestal.kafka.topic     :as topic]))
 
-(s/def ::start-fn        fn?)
-(s/def ::stop-fn         fn?)
+(s/def ::start-fn             fn?)
+(s/def ::stop-fn              fn?)
+(s/def ::service-map-in       (s/keys :req [::topic/topics]
+                                      :opt [::consumer/configuration ::producer/configuration ::start-fn ::stop-fn]))
+(s/def ::service-map-stopped  (s/keys :req [::start-fn]))
+(s/def ::service-map-started  (s/keys :req [::stop-fn]))
 
-(s/def ::topic-name      string?)
-(s/def ::topic-settings  (s/keys))
-(s/def ::topics          (s/map-of ::topic-name ::topic-settings))
+(defmacro service-fn [k]
+  `(fn [service-map#]
+     (if-let [f# (get service-map# ~k)]
+       (f# service-map#)
+       service-map#)))
 
-(s/def ::service-map-in  (s/keys :req [::topics] :opt [::consumer/configuration ::producer/configuration]))
-(s/def ::service-map-out (s/keys :req-un [::start-fn ::stop-fn]))
+(declare starter)
+
+(defn- stopper
+  [service-map]
+  {:pre  [(s/valid? ::service-map-in service-map)]
+   :post [(s/valid? ::service-map-stopped %)]}
+  (-> service-map
+      (update ::consumers consumer/stop-consumer service-map)
+      (assoc  ::start-fn starter)
+      (dissoc ::stop-fn)))
+
+(def stop  (service-fn ::stop-fn))
+
+(s/fdef stop
+        :args (s/cat :service-map ::service-map-in)
+        :ret  ::service-map-stopped)
+
+(defn- starter
+  [service-map]
+  {:pre  [(s/valid? ::service-map-in service-map)]
+   :post [(s/valid? ::service-map-started %)]}
+  (-> service-map
+      (update ::consumers consumer/start-consumer service-map)
+      (assoc  ::stop-fn stopper)
+      (dissoc ::start-fn)))
+
+(def start (service-fn ::start-fn))
+
+(s/fdef start
+        :args (s/cat :service-map ::service-map-in)
+        :ret  ::service-map-started)
+
+(defn configuration-problems
+  [service-map]
+  (when-not (s/valid? ::service-map-in service-map)
+    (s/explain-data ::service-map-in service-map)))
 
 (defn kafka-server
-  "Transforms a service map by adding :start-fn, :stop-fn,
-  and :server. The resulting server will consume Kafka messages and
-  dispatch them to an interceptor stack.
-
-  The topics to consume are defined by the ::topics key."
   [service-map]
-  (let [args (s/conform ::service-map-in service-map)]
-    (if (= args ::s/invalid)
-      (throw (ex-info "Service map is not valid" (s/explain-data ::service-map-in service-map)))
-      (assoc service-map
-             :start-fn (fn [])
-             :stop-fn  (fn []))))
-  )
-
-(s/fdef kafka-server
-        :args (s/cat :service-map ::service-map-in)
-        :ret  ::service-map-out)
-
+  (assoc service-map ::start-fn starter))
 
 (comment
 
-  (kafka-server {::topics {}
-                 ::consumer/configuration {}
-})
+  (def service-map {::topic/topics           [{::topic/name "smoketest" ::topic/parallelism 1}]
+                    ::consumer/configuration {::common/bootstrap.servers    "localhost:9902"
+                                              ::consumer/key.deserializer   consumer/string-deserializer
+                                              ::consumer/value.deserializer consumer/string-deserializer}
+                    })
+
 
 
   )

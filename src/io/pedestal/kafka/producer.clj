@@ -1,11 +1,17 @@
 (ns io.pedestal.kafka.producer
   (:require [clojure.spec :as s]
-            [io.pedestal.kafka.common :as common])
-  (:import [org.apache.kafka.common.serialization Serializer]
-           [org.apache.kafka.clients.producer Partitioner ProducerInterceptor]))
+            [io.pedestal.kafka.common :as common]
+            [clojure.core.async :as async]
+            [clojure.java.io :as io]
+            [clojure.set :as set]
+            [clojure.walk :as walk]
+            [clojure.edn :as edn]
+            [io.pedestal.kafka.consumer :as consumer])
+  (:import [org.apache.kafka.common.serialization ByteArraySerializer Serializer StringSerializer]
+           [org.apache.kafka.clients.producer KafkaProducer Partitioner ProducerInterceptor]))
 
-(s/def ::key.serializer                           #(instance? Serializer %))
-(s/def ::value.serializer                         #(instance? Serializer %))
+(s/def ::key.serializer                           (common/names-kindof? Serializer))
+(s/def ::value.serializer                         (common/names-kindof? Serializer))
 
 (s/def ::acks                                     #{:all -1 0 1})
 (s/def ::buffer.memory                            ::common/size)
@@ -15,7 +21,7 @@
 (s/def ::linger.ms                                ::common/time)
 (s/def ::max.block.ms                             ::common/time)
 (s/def ::max.request.size                         ::common/size)
-(s/def ::partitioner.class                        #(instance? Partitioner %))
+(s/def ::partitioner.class                        (common/names-kindof? Partitioner))
 (s/def ::timeout.ms                               ::common/time)
 (s/def ::block.on.buffer.full                     boolean?)
 (s/def ::max.in.flight.requests.per.connection    ::common/size)
@@ -71,3 +77,59 @@
                                      ::common/ssl.endpoint.identification.algorithm
                                      ::common/ssl.keymanager.algorithm
                                      ::common/ssl.trustmanager.algorithm]))
+
+(def string-serializer       (.getName StringSerializer))
+(def byte-array-serializer   (.getName ByteArraySerializer))
+
+(defn producer
+  "Return a producer that can be used for one or more topic->channel!
+  mappings. The configs are documented at
+  http://kafka.apache.org/documentation.html#producerconfigs
+
+  The configuration map can have the same keys as
+  org.apache.kafka.clients.producer.ProducerConfig, written as
+  keywords for easier use from Clojure. For example the
+  keyword :bootstrap.servers equates to the property
+  \"bootstrap.servers\""
+  [config]
+  (-> config
+      (walk/stringify-keys)
+      (KafkaProducer.)))
+
+;; ----------------------------------------
+;; Mapping a channel onto a topic
+
+
+;; (defn channel->topic!
+;;   "Begins mapping the given channel to a Kafka topic for the
+;;   producer. This runs as an asynchronous go loop.
+
+;;   The topic name must be a String.
+
+;;   The values coming from the channel must implement
+;;   kafka.message.Message. This namespace has some useful transducers
+;;   for creating those messages from ordinary Clojure maps.
+
+;;   The calling application supplies a channel with the buffer and
+;;   semantics that it requires.
+
+;;   To stop this mapping, close the channel.
+
+;;   Message sends are asynchronous. If you need to confirm when the send
+;;   completes, you can supply a futures-chan. The futures-chan will
+;;   get [message future] pairs.
+
+;;   Returns a map with the key :metrics. It's value is an agent that
+;;   counts the number of messages sent."
+;;   ([producer topic channel]
+;;    (channel->topic! producer topic channel (async/chan (async/dropping-buffer 1))))
+;;   ([producer topic channel futures-chan]
+;;    (let [message-count (agent 0)]
+;;      (async/go-loop []
+;;        (when-let [msg (async/<! channel)]
+;;          (let [rec     (ProducerRecord. topic (::body msg))
+;;                confirm (.send producer rec)]
+;;            (async/>! futures-chan [msg confirm]))
+;;          (send message-count inc)
+;;          (recur)))
+;;      {:metrics message-count})))

@@ -1,5 +1,13 @@
 (ns io.pedestal.kafka.common
-  (:require [clojure.spec :as s]))
+  (:require [clojure.spec :as s]
+            [io.pedestal.kafka.common :as common]
+            [clojure.walk :as walk])
+  (:import [java.util Properties]))
+
+(defn names-implementer? [classname interface]
+  (.isAssignableFrom interface (Class/forName classname)))
+
+(defn names-kindof? [interface] (s/and string? #(names-implementer? % interface)))
 
 (s/def ::size                                     (s/and integer? pos?))
 (s/def ::time                                     (s/and integer? pos?))
@@ -40,3 +48,14 @@
 (s/def ::sasl.kerberos.min.time.before.relogin    ::time)
 (s/def ::sasl.kerberos.ticket.renew.jitter        double?)
 (s/def ::sasl.kerberos.ticker.renew.window.factor double?)
+
+(defn ^Properties map->properties
+  "Translate a Clojure map into a java.util.Properties object.
+   All keys in the map must be strings."
+  [m]
+  (let [p (Properties.)]
+    (doseq [[k v] m]
+      (.setProperty p k v))
+    p))
+
+(def config->properties (comp common/map->properties walk/stringify-keys))
