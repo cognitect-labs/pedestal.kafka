@@ -9,8 +9,12 @@
 
 (defn names-kindof? [interface] (s/and string? #(names-implementer? % interface)))
 
-(s/def ::size                                     (s/and integer? pos?))
-(s/def ::time                                     (s/and integer? pos?))
+(def bool-string?    (s/and string? #{"true" "false"}))
+(def int-string?     (s/and string? #(try (Integer/parseInt %) (catch NumberFormatException _ false))))
+(def pos-int-string? (s/and string? #(try (pos? (Integer/parseInt %)) (catch NumberFormatException _ false))))
+
+(s/def ::size                                     pos-int-string?)
+(s/def ::time                                     pos-int-string?)
 
 (s/def ::bootstrap.servers                        string?)
 

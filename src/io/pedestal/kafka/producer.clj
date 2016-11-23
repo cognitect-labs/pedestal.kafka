@@ -13,20 +13,20 @@
 (s/def ::key.serializer                           (common/names-kindof? Serializer))
 (s/def ::value.serializer                         (common/names-kindof? Serializer))
 
-(s/def ::acks                                     #{:all -1 0 1})
+(s/def ::acks                                     #{:all "-1" "0" "1"})
 (s/def ::buffer.memory                            ::common/size)
 (s/def ::compression.type                         string?)
-(s/def ::retries                                  integer?)
+(s/def ::retries                                  common/int-string?)
 (s/def ::batch.size                               ::common/size)
 (s/def ::linger.ms                                ::common/time)
 (s/def ::max.block.ms                             ::common/time)
 (s/def ::max.request.size                         ::common/size)
 (s/def ::partitioner.class                        (common/names-kindof? Partitioner))
 (s/def ::timeout.ms                               ::common/time)
-(s/def ::block.on.buffer.full                     boolean?)
+(s/def ::block.on.buffer.full                     common/bool-string?)
 (s/def ::max.in.flight.requests.per.connection    ::common/size)
 (s/def ::metadata.fetch.timeout.ms                ::common/time)
-(s/def ::interceptor.classes                      (s/coll-of #(instance? ProducerInterceptor %)))
+(s/def ::interceptor.classes                      (s/coll-of #(common/names-kindof? ProducerInterceptor)))
 
 (s/def ::configuration (s/keys :req [::common/bootstrap.servers
                                      ::key.serializer

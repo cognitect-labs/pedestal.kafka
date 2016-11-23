@@ -1,21 +1,24 @@
 (ns io.pedestal.kafka.consumer
   (:require [clojure.spec :as s]
             [clojure.walk :as walk]
+            [clojure.stacktrace :as stacktrace]
+            [io.pedestal.log :as log]
+            [io.pedestal.interceptor.chain :as interceptor.chain]
             [io.pedestal.kafka.common :as common]
             [io.pedestal.kafka.topic  :as topic])
-  (:import [org.apache.kafka.clients.consumer KafkaConsumer]
-           org.apache.kafka.clients.consumer.ConsumerInterceptor
+  (:import [org.apache.kafka.clients.consumer KafkaConsumer ConsumerInterceptor ConsumerRecords ConsumerRecord OffsetAndMetadata]
            [java.util.concurrent Executors]
-           [org.apache.kafka.common.serialization ByteArrayDeserializer Deserializer StringDeserializer]))
+           [org.apache.kafka.common.serialization ByteArrayDeserializer Deserializer StringDeserializer]
+           [org.apache.kafka.common.errors WakeupException]))
 
 (s/def ::key.deserializer               (common/names-kindof? Deserializer))
 (s/def ::value.deserializer             (common/names-kindof? Deserializer))
 
 (s/def ::auto.commit.interval.ms        ::common/time)
 (s/def ::auto.offset.reset              string?)
-(s/def ::check.crcs                     boolean?)
-(s/def ::enable.auto.commit             boolean?)
-(s/def ::exclude.internal.topics        boolean?)
+(s/def ::check.crcs                     common/bool-string?)
+(s/def ::enable.auto.commit             common/bool-string?)
+(s/def ::exclude.internal.topics        common/bool-string?)
 (s/def ::fetch.max.wait.ms              ::common/time)
 (s/def ::fetch.min.bytes                ::common/size)
 (s/def ::group.id                       string?)
@@ -84,38 +87,105 @@
 (def string-deserializer     (.getName StringDeserializer))
 (def byte-array-deserializer (.getName ByteArrayDeserializer))
 
+(defn- create-consumer
+  [config]
+  (KafkaConsumer. (common/config->properties config)))
+
+(defn- consumer-record->map
+  [^ConsumerRecord record]
+  {:checksum              (.checksum record)
+   :key                   (.key record)
+   :offset                (.offset record)
+   :partition             (.partition record)
+   :serialized-key-size   (.serializedKeySize record)
+   :serialized-value-size (.serializedValueSize record)
+   :timestamp             (.timestamp record)
+   :timestamp-type        (.timestampType record)
+   :topic                 (.topic record)
+   :value                 (.value record)
+   :consumer-record       record})
+
+(defn- dispatch-record
+  [consumer interceptors ^ConsumerRecord record]
+  (let [context {:consumer consumer
+                 :message  (consumer-record->map record)}]
+    (log/debug :in :poll-and-dispatch :context context)
+    (log/counter :io.pedestal/active-kafka-messages 1)
+    (try
+      (let [final-context (interceptor.chain/execute context interceptors)]
+        (log/debug :msg "leaving interceptor chain" :final-context final-context))
+      (catch Throwable t
+        (log/meter ::dispatch-error)
+        (log/error :msg "Dispatch code threw an exception"
+                   :throwable t
+                   :cause-trace (with-out-str (stacktrace/print-cause-trace t))))
+      (finally
+        (log/counter :io.pedestal/active-kafka-messages -1)))))
+
 (defn- poll-and-dispatch
-  [service-map consumer]
-  (let [msgs (.poll consumer 100)]
-    (when (< 0 (count msgs))
-      (println "Received " (count msgs) " messages"))))
+  [interceptors consumer]
+  (let [^ConsumerRecords msgs (.poll consumer (long 100))]
+    (when (< 0 (.count msgs))
+      (doseq [record (iterator-seq (.iterator msgs))]
+        (dispatch-record consumer interceptors record)))))
 
 (defn- start-loop
-  [service-map topic-names]
-  (let [consumer   (KafkaConsumer. (common/config->properties (::configuration service-map)))
-        continue?  (atom true)
+  [consumer interceptors topic-names]
+  (println "topic names : " topic-names)
+  (let [continue?  (atom true)
         _          (.subscribe consumer topic-names)
         completion (future
-                     (while @continue?
-                       (poll-and-dispatch service-map consumer))
-                     (.close consumer)
-                     :ok)]
-    (assoc service-map ::consumer {:kafka-consumer consumer
-                                   :continue?      continue?
-                                   :completion     completion})))
+                     (try
+                       (while @continue?
+                         (try
+                           (poll-and-dispatch interceptors consumer)
+                           (catch WakeupException _)))
+                       :ok
+                       (catch Throwable t (println t) t)
+                       (finally
+                         (log/info :msg "Exiting receive loop")
+                         (.close consumer))))]
+    {:kafka-consumer consumer
+     :continue?      continue?
+     :completion     completion}))
+
+(def error-logger
+  {:name  ::error-logger
+   :error (fn [context exception]
+            (log/error :msg       "Error reached front of chain"
+                       :exception exception
+                       :context   context)
+            context)})
+
+(def default-interceptors
+  [error-logger])
 
 (defn start-consumer
   [service-map]
   (let [topic-names  (map ::topic/name (::topic/topics service-map))
-        receive-loop (start-loop service-map topic-names)]
-    (assoc service-map ::consumer receive-loop)))
+        config       (::configuration service-map)
+        interceptors (::interceptors service-map)
+        interceptors (into default-interceptors interceptors)]
+    (start-loop (create-consumer config) interceptors topic-names)))
 
 (defn stop-consumer
-  [service-map]
-  (if-let [consumer (::consumer service-map)]
-    (do
-      (reset! (:continue? consumer) false)
-      (-> service-map
-          (assoc ::consumer-shutdown (deref (:completion consumer) 100 :timeout))
-          (dissoc ::consumer)))
-    service-map))
+  [consumer]
+  (reset! (:continue? consumer) false)
+  (.wakeup (:kafka-consumer consumer))
+  (deref (:completion consumer) 100 :timeout))
+
+;; ----------------------------------------
+;; Utility functions
+
+(defn commit-sync [{consumer :consumer}]
+  (when consumer
+    (log/debug :msg "commit sync")
+    (.commitSync ^KafkaConsumer consumer)))
+
+(defn commit-message-offset [{consumer :consumer message :message}]
+  (when (and consumer message)
+    (let [commit-point (long (inc (.offset ^ConsumerRecord message)))]
+      (log/debug :msg (str "commit at " commit-point))
+      (.commit consumer (java.util.Collections/singletonMap
+                         (:partition message)
+                         (OffsetAndMetadata. commit-point))))))
