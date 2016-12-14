@@ -1,4 +1,4 @@
-(defproject pedestal.kafka "0.1.0-SNAPSHOT"
+(defproject com.cognitect/pedestal.kafka "0.1.0-SNAPSHOT"
   :description  "Chain provider and interceptors for using Pedestal with Kafka"
   :url          "http://gitlab.com/mtnygard/pedestal.kafka"
   :license      {:name "Eclipse Public License"
