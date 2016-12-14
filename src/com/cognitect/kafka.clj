@@ -10,8 +10,8 @@
 
 (s/def ::start-fn             fn?)
 (s/def ::stop-fn              fn?)
-(s/def ::service-map-in       (s/keys :req [::topic/topics]
-                                      :opt [::consumer/configuration ::producer/configuration ::start-fn ::stop-fn]))
+(s/def ::service-map-in       (s/keys :req [::topic/topics ::consumer/configuration]
+                                      :opt [::producer/configuration ::start-fn ::stop-fn]))
 (s/def ::service-map-stopped  (s/keys :req [::start-fn]))
 (s/def ::service-map-started  (s/keys :req [::stop-fn]))
 
