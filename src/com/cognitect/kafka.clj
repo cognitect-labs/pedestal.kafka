@@ -1,13 +1,12 @@
-(ns io.pedestal.kafka
-  (:require [clojure.spec :as s]
-            [io.pedestal.http.body-params :as body-params]
-            [io.pedestal.kafka.common    :as common]
-            [io.pedestal.kafka.connector :as connector]
-            [io.pedestal.kafka.producer  :as producer]
-            [io.pedestal.kafka.consumer  :as consumer]
-            [io.pedestal.kafka.topic     :as topic]
-            [io.pedestal.kafka.parser    :as parser]
-            [io.pedestal.log :as log]))
+(ns com.cognitect.kafka
+  (:require [clojure.spec                  :as s]
+            [com.cognitect.kafka.common    :as common]
+            [com.cognitect.kafka.connector :as connector]
+            [com.cognitect.kafka.producer  :as producer]
+            [com.cognitect.kafka.consumer  :as consumer]
+            [com.cognitect.kafka.topic     :as topic]
+            [com.cognitect.kafka.parser    :as parser]
+            [io.pedestal.log               :as log]))
 
 (s/def ::start-fn             fn?)
 (s/def ::stop-fn              fn?)

@@ -1,4 +1,4 @@
-(ns io.pedestal.kafka.connector
+(ns com.cognitect.kafka.connector
   (:import kafka.consumer.RangeAssignor
            kafka.message.MessageAndMetadata))
 

@@ -1,12 +1,12 @@
-(ns io.pedestal.kafka.producer
-  (:require [clojure.spec :as s]
-            [io.pedestal.kafka.common :as common]
-            [clojure.core.async :as async]
-            [clojure.java.io :as io]
-            [clojure.set :as set]
-            [clojure.walk :as walk]
-            [clojure.edn :as edn]
-            [io.pedestal.kafka.consumer :as consumer])
+(ns com.cognitect.kafka.producer
+  (:require [clojure.spec                 :as s]
+            [com.cognitect.kafka.common   :as common]
+            [clojure.core.async           :as async]
+            [clojure.java.io              :as io]
+            [clojure.set                  :as set]
+            [clojure.walk                 :as walk]
+            [clojure.edn                  :as edn]
+            [com.cognitect.kafka.consumer :as consumer])
   (:import [org.apache.kafka.common.serialization ByteArraySerializer Serializer StringSerializer]
            [org.apache.kafka.clients.producer KafkaProducer Partitioner ProducerInterceptor]))
 

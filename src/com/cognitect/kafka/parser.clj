@@ -1,9 +1,9 @@
-(ns io.pedestal.kafka.parser
-  (:require [clojure.edn :as edn]
-            [cheshire.core :as json]
-            [cheshire.parse :as parse]
-            [clojure.string :as str]
-            [io.pedestal.log :as log]
+(ns com.cognitect.kafka.parser
+  (:require [clojure.edn       :as edn]
+            [cheshire.core     :as json]
+            [cheshire.parse    :as parse]
+            [clojure.string    :as str]
+            [io.pedestal.log   :as log]
             [cognitect.transit :as transit])
   (:import [java.io StringReader PushbackReader]))
 

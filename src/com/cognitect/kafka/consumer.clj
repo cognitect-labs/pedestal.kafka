@@ -1,11 +1,11 @@
-(ns io.pedestal.kafka.consumer
-  (:require [clojure.spec :as s]
-            [clojure.walk :as walk]
-            [clojure.stacktrace :as stacktrace]
-            [io.pedestal.log :as log]
+(ns com.cognitect.kafka.consumer
+  (:require [clojure.spec                  :as s]
+            [clojure.walk                  :as walk]
+            [clojure.stacktrace            :as stacktrace]
+            [io.pedestal.log               :as log]
             [io.pedestal.interceptor.chain :as interceptor.chain]
-            [io.pedestal.kafka.common :as common]
-            [io.pedestal.kafka.topic  :as topic])
+            [com.cognitect.kafka.common    :as common]
+            [com.cognitect.kafka.topic     :as topic])
   (:import [org.apache.kafka.clients.consumer KafkaConsumer ConsumerInterceptor ConsumerRecords ConsumerRecord OffsetAndMetadata]
            [java.util.concurrent Executors]
            [org.apache.kafka.common.serialization ByteArrayDeserializer Deserializer StringDeserializer]

@@ -1,7 +1,7 @@
-(ns io.pedestal.kafka.common
-  (:require [clojure.spec :as s]
-            [io.pedestal.kafka.common :as common]
-            [clojure.walk :as walk])
+(ns com.cognitect.kafka.common
+  (:require [clojure.spec               :as s]
+            [com.cognitect.kafka.common :as common]
+            [clojure.walk               :as walk])
   (:import [java.util Properties]))
 
 (defn names-implementer? [classname interface]
