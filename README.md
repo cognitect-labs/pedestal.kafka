@@ -27,6 +27,11 @@ $ cd env/dev
 $ bin/up
 ```
 
+Several examples in `comment` sections use the Kafka broker and
+Zookeeper nodes created by the docker-compose file. You can, of
+course, replace hostnames and ports to connect to any other Kafka and
+Zookeeper instances.
+
 ## License
 
 Copyright © 2016 Michael Nygard
