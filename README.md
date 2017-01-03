@@ -1,3 +1,5 @@
+[![CircleCI](https://circleci.com/gh/cognitect-labs/pedestal.kafka.svg?style=svg&circle-token=26a5199f9dc64fa3265a576a968053410bf4399e)](https://circleci.com/gh/cognitect-labs/pedestal.kafka)
+
 # pedestal.kafka
 
 Pedestal interceptors and chain provider for Kafka applications.
