@@ -135,7 +135,6 @@
 
 (defn- start-loop
   [consumer interceptors topic-names]
-  (println "topic names : " topic-names)
   (let [continue?  (atom true)
         _          (.subscribe consumer topic-names)
         completion (future
@@ -145,7 +144,7 @@
                            (poll-and-dispatch interceptors consumer)
                            (catch WakeupException _)))
                        :ok
-                       (catch Throwable t (println t) t)
+                       (catch Throwable t t)
                        (finally
                          (log/info :msg "Exiting receive loop")
                          (.close consumer))))]
