@@ -10,10 +10,11 @@
 
 (s/def ::start-fn             fn?)
 (s/def ::stop-fn              fn?)
-(s/def ::service-map-in       (s/keys :req [::topic/topics ::consumer/configuration]
-                                      :opt [::producer/configuration ::start-fn ::stop-fn]))
+(s/def ::service-map-in       (s/keys :req [::topic/topics]
+                                      :opt [::consumer/configuration ::producer/configuration ::start-fn ::stop-fn ::consumer]))
 (s/def ::service-map-stopped  (s/keys :req [::start-fn]))
-(s/def ::service-map-started  (s/keys :req [::stop-fn]))
+(s/def ::service-map-started  (s/keys :req [::stop-fn]
+                                      :opt [::consumer-loop]))
 
 (defmacro service-fn [k]
   `(fn [service-map#]
@@ -27,11 +28,12 @@
   [service-map]
   {:pre  [(s/valid? ::service-map-in service-map)]
    :post [(s/valid? ::service-map-stopped %)]}
-  (let [shutdown-result (consumer/stop-consumer (::consumer service-map))]
-    (-> service-map
-        (assoc ::consumer-shutdown shutdown-result)
-        (dissoc ::consumer ::stop-fn)
-        (assoc ::start-fn starter))))
+  (let [shutdown-result (consumer/stop-consumer (::consumer-loop service-map))]
+    (cond-> service-map
+      true                              (assoc ::consumer-shutdown shutdown-result)
+      (::consumer-created? service-map) (dissoc ::consumer)
+      true                              (dissoc ::consumer-loop ::stop-fn)
+      true                              (assoc ::start-fn starter))))
 
 (def stop  (service-fn ::stop-fn))
 
@@ -43,10 +45,14 @@
   [service-map]
   {:pre  [(s/valid? ::service-map-in service-map)]
    :post [(s/valid? ::service-map-started %)]}
-  (let [consumer (consumer/start-consumer service-map)]
+  (let [created? (not (some? (::consumer service-map)))
+        consumer (or (::consumer service-map) (consumer/create-consumer (::consumer/configuration service-map)))
+        loop     (consumer/start-consumer consumer created? service-map)]
     (-> service-map
-        (assoc ::consumer consumer
-               ::stop-fn stopper)
+        (assoc ::consumer          consumer
+               ::consumer-created? created?
+               ::consumer-loop     loop
+               ::stop-fn           stopper)
         (dissoc ::start-fn))))
 
 (def start (service-fn ::start-fn))

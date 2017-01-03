@@ -7,6 +7,7 @@
             [com.cognitect.kafka.common    :as common]
             [com.cognitect.kafka.topic     :as topic])
   (:import [org.apache.kafka.clients.consumer KafkaConsumer ConsumerInterceptor ConsumerRecords ConsumerRecord MockConsumer OffsetAndMetadata OffsetResetStrategy]
+           [org.apache.kafka.common TopicPartition]
            [java.util.concurrent Executors]
            [org.apache.kafka.common.serialization ByteArrayDeserializer Deserializer StringDeserializer]
            [org.apache.kafka.common.errors WakeupException]))
@@ -29,71 +30,83 @@
 (s/def ::partition.assignment.strategy  string?)
 (s/def ::session.timeout.ms             ::common/time)
 
-(s/def ::configuration (s/or :mock   #(= % :mock)
-                             :config (s/keys :req [::common/bootstrap.servers
-                                           ::key.deserializer
-                                           ::value.deserializer]
-                                     :opt [::auto.commit.interval.ms
-                                           ::auto.offset.reset
-                                           ::check.crcs
-                                           ::enable.auto.commit
-                                           ::exclude.internal.topics
-                                           ::fetch.max.wait.ms
-                                           ::fetch.min.bytes
-                                           ::group.id
-                                           ::heartbeat.interval.ms
-                                           ::interceptor.classes
-                                           ::max.partition.fetch.bytes
-                                           ::max.poll.records
+(s/def ::configuration (s/keys :req [::common/bootstrap.servers
+                                     ::key.deserializer
+                                     ::value.deserializer]
+                               :opt [::auto.commit.interval.ms
+                                     ::auto.offset.reset
+                                     ::check.crcs
+                                     ::enable.auto.commit
+                                     ::exclude.internal.topics
+                                     ::fetch.max.wait.ms
+                                     ::fetch.min.bytes
+                                     ::group.id
+                                     ::heartbeat.interval.ms
+                                     ::interceptor.classes
+                                     ::max.partition.fetch.bytes
+                                     ::max.poll.records
 
-                                           ::partition.assignment.strategy
-                                           ::session.timeout.ms
+                                     ::partition.assignment.strategy
+                                     ::session.timeout.ms
 
-                                           ::common/client.id
-                                           ::common/connections.max.idle.ms
-                                           ::common/metadata.max.age.ms
-                                           ::common/receive.buffer.bytes
-                                           ::common/reconnect.backoff.ms
-                                           ::common/request.timeout.ms
-                                           ::common/retry.backoff.ms
-                                           ::common/security.protocol
-                                           ::common/send.buffer.bytes
+                                     ::common/client.id
+                                     ::common/connections.max.idle.ms
+                                     ::common/metadata.max.age.ms
+                                     ::common/receive.buffer.bytes
+                                     ::common/reconnect.backoff.ms
+                                     ::common/request.timeout.ms
+                                     ::common/retry.backoff.ms
+                                     ::common/security.protocol
+                                     ::common/send.buffer.bytes
 
-                                           ::common/metric.reporters
-                                           ::common/metrics.num.samples
-                                           ::common/metrics.sample.window.ms
+                                     ::common/metric.reporters
+                                     ::common/metrics.num.samples
+                                     ::common/metrics.sample.window.ms
 
-                                           ::common/ssl.key.password
-                                           ::common/ssl.keystore.location
-                                           ::common/ssl.keystore.password
-                                           ::common/ssl.truststore.location
-                                           ::common/ssl.truststore.password
-                                           ::common/ssl.enabled.protocols
-                                           ::common/ssl.keystore.type
-                                           ::common/ssl.protocol
-                                           ::common/ssl.provider
-                                           ::common/ssl.truststore.type
-                                           ::common/ssl.cipher.suites
-                                           ::common/ssl.endpoint.identification.algorithm
-                                           ::common/ssl.keymanager.algorithm
-                                           ::common/ssl.trustmanager.algorithm
+                                     ::common/ssl.key.password
+                                     ::common/ssl.keystore.location
+                                     ::common/ssl.keystore.password
+                                     ::common/ssl.truststore.location
+                                     ::common/ssl.truststore.password
+                                     ::common/ssl.enabled.protocols
+                                     ::common/ssl.keystore.type
+                                     ::common/ssl.protocol
+                                     ::common/ssl.provider
+                                     ::common/ssl.truststore.type
+                                     ::common/ssl.cipher.suites
+                                     ::common/ssl.endpoint.identification.algorithm
+                                     ::common/ssl.keymanager.algorithm
+                                     ::common/ssl.trustmanager.algorithm
 
-                                           ::common/sasl.kerberos.service.name
-                                           ::common/sasl.mechanism
-                                           ::common/sasl.kerberos.kinit.cmd
-                                           ::common/sasl.kerberos.min.time.before.relogin
-                                           ::common/sasl.kerberos.ticket.renew.jitter
-                                           ::common/sasl.kerberos.ticker.renew.window.factor])))
+                                     ::common/sasl.kerberos.service.name
+                                     ::common/sasl.mechanism
+                                     ::common/sasl.kerberos.kinit.cmd
+                                     ::common/sasl.kerberos.min.time.before.relogin
+                                     ::common/sasl.kerberos.ticket.renew.jitter
+                                     ::common/sasl.kerberos.ticker.renew.window.factor]))
 
 (def string-deserializer     (.getName StringDeserializer))
 (def byte-array-deserializer (.getName ByteArrayDeserializer))
 
-(defn- create-consumer
+(defn create-consumer
   [config]
   {:pre [(s/valid? ::configuration config)]}
-  (if (= :mock config)
-    (MockConsumer. OffsetResetStrategy/EARLIEST)
-    (KafkaConsumer. (common/config->properties config))))
+  (KafkaConsumer. (common/config->properties config)))
+
+(defn topic-partitions
+  [m]
+  (map #(TopicPartition. (key %) (val %)) m))
+
+(defn consumer-record
+  [{:keys [:topic :partition :offset :key :value] :or {partition 0}}]
+  (ConsumerRecord. topic partition offset key value))
+
+(defn create-mock
+  [tps messages]
+  (let [mock (doto (MockConsumer. OffsetResetStrategy/EARLIEST)
+               (.assign (topic-partitions tps)))]
+    (doseq [m messages]
+      (.addRecord mock (consumer-record m)))))
 
 (defn- consumer-record->map
   [^ConsumerRecord record]
@@ -134,7 +147,7 @@
         (dispatch-record consumer interceptors record)))))
 
 (defn- start-loop
-  [consumer interceptors topic-names]
+  [consumer interceptors topic-names auto-close?]
   (let [continue?  (atom true)
         _          (.subscribe consumer topic-names)
         completion (future
@@ -147,7 +160,8 @@
                        (catch Throwable t t)
                        (finally
                          (log/info :msg "Exiting receive loop")
-                         (.close consumer))))]
+                         (when auto-close?
+                           (.close consumer)))))]
     {:kafka-consumer consumer
      :continue?      continue?
      :completion     completion}))
@@ -164,18 +178,18 @@
   [error-logger])
 
 (defn start-consumer
-  [service-map]
+  [consumer auto-close? service-map]
   (let [topic-names  (map ::topic/name (::topic/topics service-map))
         config       (::configuration service-map)
         interceptors (::interceptors service-map)
         interceptors (into default-interceptors interceptors)]
-    (start-loop (create-consumer config) interceptors topic-names)))
+    (start-loop consumer interceptors topic-names auto-close?)))
 
 (defn stop-consumer
-  [consumer]
-  (reset! (:continue? consumer) false)
-  (.wakeup (:kafka-consumer consumer))
-  (deref (:completion consumer) 100 :timeout))
+  [loop-state]
+  (reset! (:continue? loop-state) false)
+  (.wakeup (:kafka-consumer loop-state))
+  (deref (:completion loop-state) 100 :timeout))
 
 ;; ----------------------------------------
 ;; Utility functions

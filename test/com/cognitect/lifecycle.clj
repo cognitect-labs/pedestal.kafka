@@ -23,7 +23,7 @@
 
 (deftest attempt-mock-consumer
   (-> minimal-configuration
-      (assoc ::consumer/configuration :mock)
+      (assoc ::k/consumer (consumer/create-mock {} []))
       k/kafka-server
       k/start))
 
