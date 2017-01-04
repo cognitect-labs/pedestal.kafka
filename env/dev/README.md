@@ -4,7 +4,7 @@
 
 ### Linux
 
-Install docker and docker-machine.
+Install docker version 1.12 or later.
 
 ## Startup
 
@@ -36,9 +36,7 @@ console consumer.
 
 ## Shutdown
 
-    bin/down
-
-Or just hit Ctrl-C in the terminal window where you see the logs.
+Just hit Ctrl-C in the terminal window where you see the logs.
 
 ## Checking Kafka topics
 
