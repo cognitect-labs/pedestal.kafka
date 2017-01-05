@@ -23,9 +23,10 @@
 
 (deftest attempt-mock-consumer
   (-> minimal-configuration
-      (assoc ::k/consumer (consumer/create-mock {} []))
       k/kafka-server
-      k/start))
+      (assoc ::k/consumer (consumer/create-mock))
+      k/start
+      k/stop))
 
 (deftest topic-list-is-required
   (is (thrown? AssertionError (attempt (dissoc minimal-configuration ::topic/topics)))))
@@ -34,7 +35,7 @@
   (is (thrown? AssertionError (attempt (dissoc minimal-configuration ::consumer/configuration)))))
 
 (deftest start-stop-cycle
-  (is (not (nil? (-> minimal-configuration attempt))))
-  (is (not (nil? (-> minimal-configuration attempt k/stop))))
-  (is (not (nil? (-> minimal-configuration attempt k/stop k/start))))
-  (is (not (nil? (-> minimal-configuration attempt k/stop k/start k/stop)))))
+  (is (not (nil? (-> minimal-configuration k/kafka-server k/start))))
+  (is (not (nil? (-> minimal-configuration k/kafka-server k/start k/stop))))
+  (is (thrown? AssertionError (-> minimal-configuration k/kafka-server k/start k/stop k/start)))
+  (is (thrown? AssertionError (-> minimal-configuration k/kafka-server k/start k/stop k/start k/stop))))

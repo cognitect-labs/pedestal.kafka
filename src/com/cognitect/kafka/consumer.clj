@@ -6,8 +6,7 @@
             [io.pedestal.interceptor.chain :as interceptor.chain]
             [com.cognitect.kafka.common    :as common]
             [com.cognitect.kafka.topic     :as topic])
-  (:import [org.apache.kafka.clients.consumer KafkaConsumer ConsumerInterceptor ConsumerRecords ConsumerRecord MockConsumer OffsetAndMetadata OffsetResetStrategy]
-           [org.apache.kafka.common TopicPartition]
+  (:import [org.apache.kafka.clients.consumer KafkaConsumer ConsumerInterceptor ConsumerRecord ConsumerRecords MockConsumer OffsetAndMetadata OffsetResetStrategy]
            [java.util.concurrent Executors]
            [org.apache.kafka.common.serialization ByteArrayDeserializer Deserializer StringDeserializer]
            [org.apache.kafka.common.errors WakeupException]))
@@ -93,20 +92,9 @@
   {:pre [(s/valid? ::configuration config)]}
   (KafkaConsumer. (common/config->properties config)))
 
-(defn topic-partitions
-  [m]
-  (map #(TopicPartition. (key %) (val %)) m))
-
-(defn consumer-record
-  [{:keys [:topic :partition :offset :key :value] :or {partition 0}}]
-  (ConsumerRecord. topic partition offset key value))
-
 (defn create-mock
-  [tps messages]
-  (let [mock (doto (MockConsumer. OffsetResetStrategy/EARLIEST)
-               (.assign (topic-partitions tps)))]
-    (doseq [m messages]
-      (.addRecord mock (consumer-record m)))))
+  []
+  (MockConsumer. OffsetResetStrategy/EARLIEST))
 
 (defn- consumer-record->map
   [^ConsumerRecord record]

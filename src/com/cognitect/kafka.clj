@@ -29,11 +29,10 @@
   {:pre  [(s/valid? ::service-map-in service-map)]
    :post [(s/valid? ::service-map-stopped %)]}
   (let [shutdown-result (consumer/stop-consumer (::consumer-loop service-map))]
-    (cond-> service-map
-      true                              (assoc ::consumer-shutdown shutdown-result)
-      (::consumer-created? service-map) (dissoc ::consumer)
-      true                              (dissoc ::consumer-loop ::stop-fn)
-      true                              (assoc ::start-fn starter))))
+    (-> service-map
+        (assoc ::consumer-shutdown shutdown-result)
+        (dissoc ::consumer-loop ::stop-fn)
+        (assoc ::start-fn (fn [& _] (assert false "This service cannot be restarted."))))))
 
 (def stop  (service-fn ::stop-fn))
 
