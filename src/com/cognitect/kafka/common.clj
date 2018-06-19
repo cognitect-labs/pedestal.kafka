@@ -1,5 +1,5 @@
 (ns com.cognitect.kafka.common
-  (:require [clojure.spec               :as s]
+  (:require [clojure.spec.alpha         :as s]
             [com.cognitect.kafka.common :as common]
             [clojure.walk               :as walk])
   (:import [java.util Properties]))

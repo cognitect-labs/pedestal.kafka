@@ -1,5 +1,5 @@
 (ns com.cognitect.kafka.producer
-  (:require [clojure.spec                 :as s]
+  (:require [clojure.spec.alpha           :as s]
             [com.cognitect.kafka.common   :as common]
             [clojure.core.async           :as async]
             [clojure.java.io              :as io]

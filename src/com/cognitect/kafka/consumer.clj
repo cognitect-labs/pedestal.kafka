@@ -1,5 +1,5 @@
 (ns com.cognitect.kafka.consumer
-  (:require [clojure.spec                  :as s]
+  (:require [clojure.spec.alpha            :as s]
             [clojure.walk                  :as walk]
             [clojure.stacktrace            :as stacktrace]
             [io.pedestal.log               :as log]

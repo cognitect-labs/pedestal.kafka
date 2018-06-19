@@ -1,5 +1,5 @@
 (ns com.cognitect.kafka.topic
-  (:require [clojure.spec               :as s]
+  (:require [clojure.spec.alpha         :as s]
             [com.cognitect.kafka.common :as common]))
 
 (s/def ::name        string?)
