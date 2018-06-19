@@ -1,5 +1,5 @@
 (ns com.cognitect.kafka
-  (:require [clojure.spec                  :as s]
+  (:require [clojure.spec.alpha            :as s]
             [com.cognitect.kafka.common    :as common]
             [com.cognitect.kafka.connector :as connector]
             [com.cognitect.kafka.producer  :as producer]

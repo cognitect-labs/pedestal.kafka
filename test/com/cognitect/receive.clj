@@ -4,7 +4,7 @@
             [com.cognitect.kafka.common   :as common]
             [com.cognitect.kafka.consumer :as consumer]
             [com.cognitect.kafka.topic    :as topic]
-            [clojure.spec :as s])
+            [clojure.spec.alpha :as s])
   (:import [org.apache.kafka.clients.consumer ConsumerRecord]
            [org.apache.kafka.common TopicPartition]))
 
